@@ -8,8 +8,8 @@ import (
 	"github.com/UTC-Six/pool/threading"
 )
 
-// ContextEnhancer 增强context的函数类型
-type ContextEnhancer func(ctx context.Context) context.Context
+// ContextEnhancer 增强context的函数类型，返回带cancel的context
+type ContextEnhancer func(ctx context.Context) (context.Context, context.CancelFunc)
 
 // TrackerOption 追踪器选项
 type TrackerOption func(*LatencyTracker)
@@ -59,9 +59,9 @@ func defaultLogger(ctx context.Context, format string, args ...interface{}) {
 }
 
 // defaultContextEnhancer 默认的context增强器
-func defaultContextEnhancer(ctx context.Context) context.Context {
-	// 如果没有设置WithContextEnhancer，直接返回Background
-	return context.Background()
+func defaultContextEnhancer(ctx context.Context) (context.Context, context.CancelFunc) {
+	// 如果没有设置WithContextEnhancer，返回Background和空cancel函数
+	return context.Background(), func() {}
 }
 
 // Track 追踪执行时间（最优实现）
@@ -79,11 +79,14 @@ func Track(ctx context.Context, startTime time.Time, name string, logger func(ct
 	// 计算耗时
 	duration := time.Since(startTime)
 
-	// 使用配置的context增强器创建新的context
-	enhancedCtx := defaultTracker.contextEnhancer(ctx)
+	// 使用配置的context增强器创建新的context和cancel函数
+	enhancedCtx, cancel := defaultTracker.contextEnhancer(ctx)
 
 	// 使用 threading.GoSafe 异步记录完成日志（最优选择）
 	threading.GoSafe(func() error {
+		// 确保在异步操作完成后调用cancel
+		defer cancel()
+
 		// 使用 logz 格式的日志，traceID 会自动从 enhancedCtx 中提取
 		logger(enhancedCtx, "[Latency] Name=%s, Duration=%v, Status=completed", name, duration)
 		return nil
@@ -93,6 +96,8 @@ func Track(ctx context.Context, startTime time.Time, name string, logger func(ct
 			logger(enhancedCtx, format, args...)
 		}),
 		threading.WithRecovery(func(r interface{}) {
+			// 在错误恢复中也确保调用cancel
+			defer cancel()
 			logger(enhancedCtx, "[Latency] Name=%s, Duration=%v, Status=logError, Error=%v", name, duration, r)
 		}))
 }

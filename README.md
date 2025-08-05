@@ -86,7 +86,7 @@ func WithLogger(logger func(ctx context.Context, format string, args ...interfac
 func WithContextEnhancer(enhancer ContextEnhancer) TrackerOption
 
 // ContextEnhancer 类型定义
-type ContextEnhancer func(ctx context.Context) context.Context
+type ContextEnhancer func(ctx context.Context) (context.Context, context.CancelFunc)
 ```
 
 ### 优雅的使用方式
@@ -171,34 +171,35 @@ func myFunction(ctx context.Context) error {
 
 ```go
 // 自定义的context增强器
-func customContextEnhancer(ctx context.Context) context.Context {
-    // 如果ctx为空，返回Background
-    if ctx == nil {
-        return context.Background()
-    }
+func customContextEnhancer(ctx context.Context) (context.Context, context.CancelFunc) {
+	// 如果ctx为空，返回Background和空cancel函数
+	if ctx == nil {
+		return context.Background(), func() {}
+	}
 
-    // 创建一个新的 context
-    asyncCtx := context.Background()
-    
-    // 复制原 ctx 中的关键信息到新的 ctx
-    if traceValue := ctx.Value("trace-id"); traceValue != nil {
-        asyncCtx = context.WithValue(asyncCtx, "trace-id", traceValue)
-    }
-    if traceValue := ctx.Value("uber-trace-id"); traceValue != nil {
-        asyncCtx = context.WithValue(asyncCtx, "uber-trace-id", traceValue)
-    }
-    if traceValue := ctx.Value("X-B3-TraceId"); traceValue != nil {
-        asyncCtx = context.WithValue(asyncCtx, "X-B3-TraceId", traceValue)
-    }
-    
-    // 如果没有找到任何traceID，返回Background
-    if asyncCtx.Value("trace-id") == nil && 
-       asyncCtx.Value("uber-trace-id") == nil && 
-       asyncCtx.Value("X-B3-TraceId") == nil {
-        return context.Background()
-    }
-    
-    return asyncCtx
+	// 创建一个带cancel的context
+	asyncCtx, cancel := context.WithCancel(context.Background())
+	
+	// 复制原 ctx 中的关键信息到新的 ctx
+	if traceValue := ctx.Value("trace-id"); traceValue != nil {
+		asyncCtx = context.WithValue(asyncCtx, "trace-id", traceValue)
+	}
+	if traceValue := ctx.Value("uber-trace-id"); traceValue != nil {
+		asyncCtx = context.WithValue(asyncCtx, "uber-trace-id", traceValue)
+	}
+	if traceValue := ctx.Value("X-B3-TraceId"); traceValue != nil {
+		asyncCtx = context.WithValue(asyncCtx, "X-B3-TraceId", traceValue)
+	}
+	
+	// 如果没有找到任何traceID，返回Background和空cancel函数
+	if asyncCtx.Value("trace-id") == nil && 
+	   asyncCtx.Value("uber-trace-id") == nil && 
+	   asyncCtx.Value("X-B3-TraceId") == nil {
+		cancel() // 取消之前创建的context
+		return context.Background(), func() {}
+	}
+	
+	return asyncCtx, cancel
 }
 
 // 创建延迟追踪器
@@ -265,11 +266,14 @@ func myFunction(ctx context.Context) error {
 
 ### 解决方案
 ```go
-// 使用配置的context增强器创建新的context
-enhancedCtx := defaultTracker.contextEnhancer(ctx)
+// 使用配置的context增强器创建新的context和cancel函数
+enhancedCtx, cancel := defaultTracker.contextEnhancer(ctx)
 
-// 在异步 goroutine 中使用 enhancedCtx
+// 在异步 goroutine 中使用 enhancedCtx，并在完成后调用cancel
 threading.GoSafe(func() error {
+    // 确保在异步操作完成后调用cancel
+    defer cancel()
+    
     logz.Infof(enhancedCtx, "[Latency] Name=%s, Duration=%v", name, duration)
     return nil
 })
@@ -279,8 +283,9 @@ threading.GoSafe(func() error {
 1. **保证 traceID 可用**：异步执行时 traceID 仍然有效
 2. **避免 context 失效**：不依赖可能已失效的原始 context
 3. **完整信息传递**：复制所有关键的链路追踪信息
-4. **统一配置**：公司内部可以统一配置一次，所有服务复用
-5. **兜底处理**：空 context 或无 traceID 时返回 `context.Background()`
+4. **正确的资源管理**：在异步操作完成后调用 cancel，避免过早取消
+5. **统一配置**：公司内部可以统一配置一次，所有服务复用
+6. **兜底处理**：空 context 或无 traceID 时返回 `context.Background()`
 
 ## 配置
 

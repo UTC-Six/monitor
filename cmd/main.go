@@ -33,14 +33,14 @@ func logzInfof(ctx context.Context, format string, args ...interface{}) {
 // =============================================================================
 
 // customContextEnhancer 自定义的context增强器
-func customContextEnhancer(ctx context.Context) context.Context {
-	// 如果ctx为空，返回Background
+func customContextEnhancer(ctx context.Context) (context.Context, context.CancelFunc) {
+	// 如果ctx为空，返回Background和空cancel函数
 	if ctx == nil {
-		return context.Background()
+		return context.Background(), func() {}
 	}
 
-	// 创建一个新的 context
-	asyncCtx := context.Background()
+	// 创建一个带cancel的context
+	asyncCtx, cancel := context.WithCancel(context.Background())
 
 	// 复制原 ctx 中的关键信息到新的 ctx
 	if traceValue := ctx.Value("trace-id"); traceValue != nil {
@@ -62,14 +62,15 @@ func customContextEnhancer(ctx context.Context) context.Context {
 		asyncCtx = context.WithValue(asyncCtx, "correlation-id", traceValue)
 	}
 
-	// 如果没有找到任何traceID，返回Background
+	// 如果没有找到任何traceID，返回Background和空cancel函数
 	if asyncCtx.Value("trace-id") == nil &&
 		asyncCtx.Value("uber-trace-id") == nil &&
 		asyncCtx.Value("X-B3-TraceId") == nil {
-		return context.Background()
+		cancel() // 取消之前创建的context
+		return context.Background(), func() {}
 	}
 
-	return asyncCtx
+	return asyncCtx, cancel
 }
 
 // =============================================================================
