@@ -1,13 +1,13 @@
-# Monitor - 高性能异步监控包
+# Monitor - 高性能异步延迟追踪包
 
 ## 概述
 
-Monitor 是一个专为 Go 应用设计的轻量级、高性能异步监控包。它使用 `threading.GoSafe` 作为唯一的异步处理方案，为函数和 API 执行提供非阻塞的性能监控，并完美集成 `logz` 格式的日志系统。
+Monitor 是一个专为 Go 应用设计的轻量级、高性能异步延迟追踪包。它使用 `threading.GoSafe` 作为唯一的异步处理方案，为函数和 API 执行提供非阻塞的延迟追踪，并完美集成 `logz` 格式的日志系统。
 
 ## 核心特性
 
 ### 🚀 **极简设计**
-- **单一方法**：只提供一个 `Monitor` 方法，简洁高效
+- **单一方法**：只提供一个 `Track` 方法，简洁高效
 - **灵活使用**：用户可以根据需要自定义 name 参数
 - **零学习成本**：API 简单直观，易于使用
 
@@ -29,7 +29,7 @@ Monitor 是一个专为 Go 应用设计的轻量级、高性能异步监控包�
 ### 🔧 **Optional 配置方式**
 - **无需 init 函数**：支持默认配置，开箱即用
 - **WithLogger 选项**：如果没有设置，使用默认 logger
-- **WithCtx 选项**：如果没有设置，直接返回 `context.Background()`
+- **WithContextEnhancer 选项**：如果没有设置，直接返回 `context.Background()`
 - **组合使用**：支持同时使用多个选项
 
 ## 为什么选择 threading.GoSafe？
@@ -70,50 +70,50 @@ threading.GoSafe(func() error {
 ### 核心 API
 
 ```go
-// 监控执行时间
-func Monitor(ctx context.Context, startTime time.Time, name string, logger func(ctx context.Context, format string, args ...interface{}))
+// 追踪执行时间
+func Track(ctx context.Context, startTime time.Time, name string, logger func(ctx context.Context, format string, args ...interface{}))
 
-// 创建监控器（支持选项）
-func NewPerformanceMonitor(opts ...MonitorOption) *PerformanceMonitor
+// 创建延迟追踪器（支持选项）
+func NewLatencyTracker(opts ...TrackerOption) *LatencyTracker
 
 // 选项类型
-type MonitorOption func(*PerformanceMonitor)
+type TrackerOption func(*LatencyTracker)
 
 // WithLogger 设置日志函数选项
-func WithLogger(logger func(ctx context.Context, format string, args ...interface{})) MonitorOption
+func WithLogger(logger func(ctx context.Context, format string, args ...interface{})) TrackerOption
 
-// WithCtx 设置context处理函数选项
-func WithCtx(processor ContextProcessor) MonitorOption
+// WithContextEnhancer 设置context增强函数选项
+func WithContextEnhancer(enhancer ContextEnhancer) TrackerOption
 
-// ContextProcessor 类型定义
-type ContextProcessor func(ctx context.Context) context.Context
+// ContextEnhancer 类型定义
+type ContextEnhancer func(ctx context.Context) context.Context
 ```
 
 ### 优雅的使用方式
 
 ```go
-// 监控函数执行时间
+// 追踪函数执行时间
 func myFunction(ctx context.Context) error {
     start := time.Now()
-    defer monitor.Monitor(ctx, start, "myFunction", nil)
+    defer monitor.Track(ctx, start, "myFunction", nil)
     
     // 你的业务逻辑
     return nil
 }
 
-// 监控API接口执行时间
+// 追踪API接口执行时间
 func apiHandler(ctx context.Context) error {
     start := time.Now()
-    defer monitor.Monitor(ctx, start, "GET /api/users", nil)
+    defer monitor.Track(ctx, start, "GET /api/users", nil)
     
     // API处理逻辑
     return nil
 }
 
-// 自定义监控名称
+// 自定义追踪名称
 func complexFunction(ctx context.Context) error {
     start := time.Now()
-    defer monitor.Monitor(ctx, start, "ComplexBusinessLogic", nil)
+    defer monitor.Track(ctx, start, "ComplexBusinessLogic", nil)
     
     // 复杂业务逻辑
     return nil
@@ -135,7 +135,7 @@ import (
 
 func businessFunction(ctx context.Context) error {
     start := time.Now()
-    defer monitor.Monitor(ctx, start, "businessFunction", nil)
+    defer monitor.Track(ctx, start, "businessFunction", nil)
     
     // 业务逻辑
     time.Sleep(100 * time.Millisecond)
@@ -152,7 +152,7 @@ func main() {
 
 ```go
 // 设置 logz 格式的日志函数
-monitor := NewPerformanceMonitor(
+tracker := NewLatencyTracker(
     WithLogger(func(ctx context.Context, format string, args ...interface{}) {
         logz.Infof(ctx, format, args...)
     }),
@@ -160,7 +160,7 @@ monitor := NewPerformanceMonitor(
 
 func myFunction(ctx context.Context) error {
     start := time.Now()
-    defer monitor.Monitor(ctx, start, "myFunction", nil)
+    defer monitor.Track(ctx, start, "myFunction", nil)
     
     // 业务逻辑
     return nil
@@ -170,8 +170,8 @@ func myFunction(ctx context.Context) error {
 ### 使用 WithCtx 选项
 
 ```go
-// 自定义的context处理器
-func customContextProcessor(ctx context.Context) context.Context {
+// 自定义的context增强器
+func customContextEnhancer(ctx context.Context) context.Context {
     // 如果ctx为空，返回Background
     if ctx == nil {
         return context.Background()
@@ -201,26 +201,26 @@ func customContextProcessor(ctx context.Context) context.Context {
     return asyncCtx
 }
 
-// 创建监控器
-monitor := NewPerformanceMonitor(
-    WithCtx(customContextProcessor),
+// 创建延迟追踪器
+tracker := NewLatencyTracker(
+    WithContextEnhancer(customContextEnhancer),
 )
 ```
 
 ### 组合使用多个选项
 
 ```go
-// 同时使用 WithLogger 和 WithCtx
-monitor := NewPerformanceMonitor(
+// 同时使用 WithLogger 和 WithContextEnhancer
+tracker := NewLatencyTracker(
     WithLogger(func(ctx context.Context, format string, args ...interface{}) {
         logz.Infof(ctx, format, args...)
     }),
-    WithCtx(customContextProcessor),
+    WithContextEnhancer(customContextEnhancer),
 )
 
 func myFunction(ctx context.Context) error {
     start := time.Now()
-    defer monitor.Monitor(ctx, start, "myFunction", nil)
+    defer monitor.Track(ctx, start, "myFunction", nil)
     
     // 业务逻辑
     return nil
@@ -248,14 +248,14 @@ func myFunction(ctx context.Context) error {
 
 ## 日志输出格式
 
-### 监控日志
+### 延迟日志
 ```
-[TraceID=trace-12345] [Performance] Name=myFunction, Duration=100.5ms, Status=completed
+[TraceID=trace-12345] [Latency] Name=myFunction, Duration=100.5ms, Status=completed
 ```
 
 ### 错误日志
 ```
-[TraceID=trace-12345] [Performance] Name=myFunction, Duration=100.5ms, Status=logError, Error=panic occurred
+[TraceID=trace-12345] [Latency] Name=myFunction, Duration=100.5ms, Status=logError, Error=panic occurred
 ```
 
 ## Context 安全传递机制
@@ -265,12 +265,12 @@ func myFunction(ctx context.Context) error {
 
 ### 解决方案
 ```go
-// 使用配置的context处理器创建新的context
-asyncCtx := defaultMonitor.contextProcessor(ctx)
+// 使用配置的context增强器创建新的context
+enhancedCtx := defaultTracker.contextEnhancer(ctx)
 
-// 在异步 goroutine 中使用 asyncCtx
+// 在异步 goroutine 中使用 enhancedCtx
 threading.GoSafe(func() error {
-    logz.Infof(asyncCtx, "[Performance] Name=%s, Duration=%v", name, duration)
+    logz.Infof(enhancedCtx, "[Latency] Name=%s, Duration=%v", name, duration)
     return nil
 })
 ```
@@ -290,7 +290,7 @@ threading.GoSafe(func() error {
 // 无需任何配置，直接使用
 func myFunction(ctx context.Context) error {
     start := time.Now()
-    defer monitor.Monitor(ctx, start, "myFunction", nil)
+    defer monitor.Track(ctx, start, "myFunction", nil)
     
     // 业务逻辑
     return nil
@@ -300,12 +300,12 @@ func myFunction(ctx context.Context) error {
 ### 自定义配置
 
 ```go
-// 创建自定义监控器
-monitor := NewPerformanceMonitor(
+// 创建自定义延迟追踪器
+tracker := NewLatencyTracker(
     WithLogger(func(ctx context.Context, format string, args ...interface{}) {
         logz.Infof(ctx, format, args...)
     }),
-    WithCtx(customContextProcessor),
+    WithContextEnhancer(customContextEnhancer),
 )
 ```
 
@@ -332,7 +332,7 @@ monitor := NewPerformanceMonitor(
 ```go
 func myFunction(ctx context.Context) error {
     start := time.Now()
-    defer monitor.Monitor(ctx, start, "myFunction", nil)
+    defer monitor.Track(ctx, start, "myFunction", nil)
     
     // 业务逻辑
     return nil
@@ -341,17 +341,17 @@ func myFunction(ctx context.Context) error {
 
 ### 2. **使用 WithLogger 集成 logz**
 ```go
-monitor := NewPerformanceMonitor(
+tracker := NewLatencyTracker(
     WithLogger(func(ctx context.Context, format string, args ...interface{}) {
         logz.Infof(ctx, format, args...)
     }),
 )
 ```
 
-### 3. **使用 WithCtx 自定义 Context 处理**
+### 3. **使用 WithContextEnhancer 自定义 Context 处理**
 ```go
-monitor := NewPerformanceMonitor(
-    WithCtx(customContextProcessor),
+collector := NewMetricsCollector(
+    WithContextEnhancer(customContextEnhancer),
 )
 ```
 
@@ -364,27 +364,27 @@ ctx := context.WithValue(ctx, "trace-id", traceID)
 ### 5. **合理命名**
 ```go
 // 使用有意义的名称
-defer monitor.Monitor(ctx, start, "UserAuthentication", nil)
-defer monitor.Monitor(ctx, start, "DatabaseQuery", nil)
-defer monitor.Monitor(ctx, start, "GET /api/users", nil)
+defer monitor.Track(ctx, start, "UserAuthentication", nil)
+defer monitor.Track(ctx, start, "DatabaseQuery", nil)
+defer monitor.Track(ctx, start, "GET /api/users", nil)
 ```
 
-### 6. **避免过度监控**
+### 6. **避免过度追踪**
 ```go
-// 只监控重要的函数和API
-// 避免监控过于频繁的简单函数
+// 只追踪重要的函数和API
+// 避免追踪过于频繁的简单函数
 ```
 
 ## 设计优势总结
 
 ### 1. **极简设计**
-- 只有一个 Monitor 方法，简洁高效
+- 只有一个 Track 方法，简洁高效
 - 用户可以根据需要自定义 name 参数
 - 零学习成本，易于使用
 
 ### 2. **Optional 配置**
 - 无需 init 函数，支持默认配置
-- 使用 WithLogger 和 WithCtx 的 optional 方式
+- 使用 WithLogger 和 WithContextEnhancer 的 optional 方式
 - 支持组合使用多个选项
 
 ### 3. **简单可靠**
@@ -403,7 +403,7 @@ defer monitor.Monitor(ctx, start, "GET /api/users", nil)
 - Context 安全传递
 
 ### 6. **可配置性**
-- 支持自定义 ContextProcessor
+- 支持自定义 ContextEnhancer
 - 公司内部可以统一配置一次
 - 兜底处理，安全可靠
 

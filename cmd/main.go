@@ -32,8 +32,8 @@ func logzInfof(ctx context.Context, format string, args ...interface{}) {
 // 自定义 Context 处理器
 // =============================================================================
 
-// customContextProcessor 自定义的context处理器
-func customContextProcessor(ctx context.Context) context.Context {
+// customContextEnhancer 自定义的context增强器
+func customContextEnhancer(ctx context.Context) context.Context {
 	// 如果ctx为空，返回Background
 	if ctx == nil {
 		return context.Background()
@@ -82,7 +82,7 @@ type UserService struct{}
 // GetUser 获取用户信息
 func (s *UserService) GetUser(ctx context.Context, userID string) (*User, error) {
 	start := time.Now()
-	defer monitor.Monitor(ctx, start, "UserService.GetUser", nil)
+	defer monitor.Track(ctx, start, "UserService.GetUser", nil)
 
 	// 模拟数据库查询
 	time.Sleep(time.Duration(rand.Intn(200)) * time.Millisecond)
@@ -98,7 +98,7 @@ func (s *UserService) GetUser(ctx context.Context, userID string) (*User, error)
 // CreateUser 创建用户
 func (s *UserService) CreateUser(ctx context.Context, user *User) error {
 	start := time.Now()
-	defer monitor.Monitor(ctx, start, "UserService.CreateUser", nil)
+	defer monitor.Track(ctx, start, "UserService.CreateUser", nil)
 
 	// 模拟数据库插入
 	time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
@@ -137,7 +137,7 @@ func NewAPIHandler() *APIHandler {
 // GetUserHandler 获取用户API处理器
 func (h *APIHandler) GetUserHandler(ctx context.Context, userID string) (*User, error) {
 	start := time.Now()
-	defer monitor.Monitor(ctx, start, "GET /api/users/{id}", nil)
+	defer monitor.Track(ctx, start, "GET /api/users/{id}", nil)
 
 	// 调用业务逻辑
 	return h.userService.GetUser(ctx, userID)
@@ -146,7 +146,7 @@ func (h *APIHandler) GetUserHandler(ctx context.Context, userID string) (*User, 
 // CreateUserHandler 创建用户API处理器
 func (h *APIHandler) CreateUserHandler(ctx context.Context, user *User) error {
 	start := time.Now()
-	defer monitor.Monitor(ctx, start, "POST /api/users", nil)
+	defer monitor.Track(ctx, start, "POST /api/users", nil)
 
 	// 调用业务逻辑
 	return h.userService.CreateUser(ctx, user)
@@ -162,7 +162,7 @@ type DatabaseService struct{}
 // Query 数据库查询
 func (s *DatabaseService) Query(ctx context.Context, sql string, args ...interface{}) ([]map[string]interface{}, error) {
 	start := time.Now()
-	defer monitor.Monitor(ctx, start, "DatabaseService.Query", nil)
+	defer monitor.Track(ctx, start, "DatabaseService.Query", nil)
 
 	// 模拟数据库查询
 	time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
@@ -179,7 +179,7 @@ func (s *DatabaseService) Query(ctx context.Context, sql string, args ...interfa
 // Transaction 数据库事务
 func (s *DatabaseService) Transaction(ctx context.Context, fn func(ctx context.Context) error) error {
 	start := time.Now()
-	defer monitor.Monitor(ctx, start, "DatabaseService.Transaction", nil)
+	defer monitor.Track(ctx, start, "DatabaseService.Transaction", nil)
 
 	// 模拟事务开始
 	time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
@@ -206,7 +206,7 @@ type ExternalService struct{}
 // CallAPI 调用外部API
 func (s *ExternalService) CallAPI(ctx context.Context, url string, method string) ([]byte, error) {
 	start := time.Now()
-	defer monitor.Monitor(ctx, start, fmt.Sprintf("%s %s", method, url), nil)
+	defer monitor.Track(ctx, start, fmt.Sprintf("%s %s", method, url), nil)
 
 	// 模拟HTTP请求
 	time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
@@ -287,28 +287,28 @@ func demonstrateInitialization() {
 
 	// 默认配置
 	fmt.Println("   - 默认配置:")
-	monitor1 := monitor.NewPerformanceMonitor()
-	fmt.Printf("     默认logger: %T\n", monitor1)
-	fmt.Printf("     默认contextProcessor: %T\n", monitor1)
+	tracker1 := monitor.NewLatencyTracker()
+	fmt.Printf("     默认logger: %T\n", tracker1)
+	fmt.Printf("     默认contextEnhancer: %T\n", tracker1)
 
 	// 使用 WithLogger
 	fmt.Println("   - 使用 WithLogger:")
-	monitor2 := monitor.NewPerformanceMonitor(monitor.WithLogger(logzInfof))
-	fmt.Printf("     自定义logger: %T\n", monitor2)
+	tracker2 := monitor.NewLatencyTracker(monitor.WithLogger(logzInfof))
+	fmt.Printf("     自定义logger: %T\n", tracker2)
 
-	// 使用 WithCtx
-	fmt.Println("   - 使用 WithCtx:")
-	monitor3 := monitor.NewPerformanceMonitor(monitor.WithCtx(customContextProcessor))
-	fmt.Printf("     自定义contextProcessor: %T\n", monitor3)
+	// 使用 WithContextEnhancer
+	fmt.Println("   - 使用 WithContextEnhancer:")
+	tracker3 := monitor.NewLatencyTracker(monitor.WithContextEnhancer(customContextEnhancer))
+	fmt.Printf("     自定义contextEnhancer: %T\n", tracker3)
 
 	// 组合使用
-	fmt.Println("   - 同时使用 WithLogger 和 WithCtx:")
-	monitor4 := monitor.NewPerformanceMonitor(
+	fmt.Println("   - 同时使用 WithLogger 和 WithContextEnhancer:")
+	tracker4 := monitor.NewLatencyTracker(
 		monitor.WithLogger(logzInfof),
-		monitor.WithCtx(customContextProcessor),
+		monitor.WithContextEnhancer(customContextEnhancer),
 	)
-	fmt.Printf("     自定义logger: %T\n", monitor4)
-	fmt.Printf("     自定义contextProcessor: %T\n", monitor4)
+	fmt.Printf("     自定义logger: %T\n", tracker4)
+	fmt.Printf("     自定义contextEnhancer: %T\n", tracker4)
 	fmt.Println()
 }
 
@@ -318,17 +318,17 @@ func demonstrateBasicMonitoring() {
 	ctx := context.Background()
 
 	// 基本函数监控
-	monitor.Monitor(ctx, time.Now(), "basicFunction", nil)
+	monitor.Track(ctx, time.Now(), "basicFunction", nil)
 
 	// 带自定义logger的监控
-	monitor.Monitor(ctx, time.Now(), "functionWithCustomLogger", logzInfof)
+	monitor.Track(ctx, time.Now(), "functionWithCustomLogger", logzInfof)
 
 	// 空context监控
-	monitor.Monitor(nil, time.Now(), "nilContext", logzInfof)
+	monitor.Track(nil, time.Now(), "nilContext", logzInfof)
 
 	// 无traceID的context监控
 	emptyCtx := context.WithValue(ctx, "other-key", "other-value")
-	monitor.Monitor(emptyCtx, time.Now(), "emptyTraceContext", logzInfof)
+	monitor.Track(emptyCtx, time.Now(), "emptyTraceContext", logzInfof)
 
 	fmt.Println()
 }
@@ -444,19 +444,19 @@ func demonstrateTracingSystems() {
 
 	// 自定义 traceID
 	ctx1 := createContextWithTraceID("trace-12345")
-	monitor.Monitor(ctx1, time.Now(), "customTraceID", logzInfof)
+	monitor.Track(ctx1, time.Now(), "customTraceID", logzInfof)
 
 	// Jaeger traceID
 	ctx2 := createContextWithJaegerTraceID("1-5759e988-bd862e3fe1be46a994272793")
-	monitor.Monitor(ctx2, time.Now(), "jaegerTraceID", logzInfof)
+	monitor.Track(ctx2, time.Now(), "jaegerTraceID", logzInfof)
 
 	// Zipkin traceID
 	ctx3 := createContextWithZipkinTraceID("bd862e3fe1be46a994272793")
-	monitor.Monitor(ctx3, time.Now(), "zipkinTraceID", logzInfof)
+	monitor.Track(ctx3, time.Now(), "zipkinTraceID", logzInfof)
 
 	// OpenTelemetry traceparent
 	ctx4 := context.WithValue(context.Background(), "traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
-	monitor.Monitor(ctx4, time.Now(), "openTelemetryTraceID", logzInfof)
+	monitor.Track(ctx4, time.Now(), "openTelemetryTraceID", logzInfof)
 
 	fmt.Println()
 }
@@ -475,7 +475,7 @@ func demonstrateErrorScenarios() {
 		}()
 
 		start := time.Now()
-		defer monitor.Monitor(ctx, start, "panicFunction", logzInfof)
+		defer monitor.Track(ctx, start, "panicFunction", logzInfof)
 
 		// 模拟panic
 		panic("模拟panic场景")
@@ -483,7 +483,7 @@ func demonstrateErrorScenarios() {
 
 	// 模拟长时间运行的函数
 	start := time.Now()
-	defer monitor.Monitor(ctx, start, "longRunningFunction", logzInfof)
+	defer monitor.Track(ctx, start, "longRunningFunction", logzInfof)
 
 	time.Sleep(100 * time.Millisecond)
 	fmt.Printf("   长时间运行函数完成\n")
