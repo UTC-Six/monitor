@@ -1,5 +1,5 @@
 module github.com/UTC-Six/monitor
 
-go 1.24.4
+go 1.24.2
 
-require github.com/UTC-Six/pool v0.0.0-20250717140604-a2355e1181d6
+require github.com/UTC-Six/pool v0.0.5
