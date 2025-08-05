@@ -70,11 +70,14 @@ threading.GoSafe(func() error {
 ### 核心 API
 
 ```go
-// 追踪执行时间
+// 包级函数：使用默认追踪器追踪执行时间
 func Track(ctx context.Context, startTime time.Time, name string, logger func(ctx context.Context, format string, args ...interface{}))
 
 // 创建延迟追踪器（支持选项）
 func NewLatencyTracker(opts ...TrackerOption) *LatencyTracker
+
+// 实例方法：追踪执行时间
+func (lt *LatencyTracker) Track(ctx context.Context, startTime time.Time, name string, logger func(ctx context.Context, format string, args ...interface{}))
 
 // 选项类型
 type TrackerOption func(*LatencyTracker)
@@ -90,6 +93,8 @@ type ContextEnhancer func(ctx context.Context) (context.Context, context.CancelF
 ```
 
 ### 优雅的使用方式
+
+#### 方式一：包级函数（推荐用于简单场景）
 
 ```go
 // 追踪函数执行时间
@@ -116,6 +121,41 @@ func complexFunction(ctx context.Context) error {
     defer monitor.Track(ctx, start, "ComplexBusinessLogic", nil)
     
     // 复杂业务逻辑
+    return nil
+}
+```
+
+#### 方式二：实例方法（推荐用于需要自定义配置的场景）
+
+```go
+// 创建自定义追踪器
+customTracker := monitor.NewLatencyTracker(
+    monitor.WithLogger(logzInfof),
+    monitor.WithContextEnhancer(customContextEnhancer),
+)
+
+// 使用实例方法追踪
+func myFunction(ctx context.Context) error {
+    start := time.Now()
+    defer customTracker.Track(ctx, start, "myFunction", nil)
+    
+    // 你的业务逻辑
+    return nil
+}
+
+// 创建不同配置的追踪器
+simpleTracker := monitor.NewLatencyTracker(
+    monitor.WithLogger(func(ctx context.Context, format string, args ...interface{}) {
+        fmt.Printf("[Simple] "+format+"\n", args...)
+    }),
+)
+
+// 使用简单追踪器
+func simpleFunction(ctx context.Context) error {
+    start := time.Now()
+    defer simpleTracker.Track(ctx, start, "simpleFunction", nil)
+    
+    // 简单业务逻辑
     return nil
 }
 ```

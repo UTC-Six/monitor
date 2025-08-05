@@ -254,22 +254,25 @@ func main() {
 	// 2. 演示基本监控功能
 	demonstrateBasicMonitoring()
 
-	// 3. 演示业务函数监控
+	// 3. 演示实例方法使用
+	demonstrateInstanceBasedUsage()
+
+	// 4. 演示业务函数监控
 	demonstrateBusinessFunctionMonitoring()
 
-	// 4. 演示API监控
+	// 5. 演示API监控
 	demonstrateAPIMonitoring()
 
-	// 5. 演示数据库操作监控
+	// 6. 演示数据库操作监控
 	demonstrateDatabaseMonitoring()
 
-	// 6. 演示外部服务调用监控
+	// 7. 演示外部服务调用监控
 	demonstrateExternalServiceMonitoring()
 
-	// 7. 演示不同链路追踪系统
+	// 8. 演示不同链路追踪系统
 	demonstrateTracingSystems()
 
-	// 8. 演示错误场景
+	// 9. 演示错误场景
 	demonstrateErrorScenarios()
 
 	// 等待异步日志输出
@@ -318,18 +321,46 @@ func demonstrateBasicMonitoring() {
 
 	ctx := context.Background()
 
-	// 基本函数监控
+	// 基本函数监控（包级函数）
 	monitor.Track(ctx, time.Now(), "basicFunction", nil)
 
-	// 带自定义logger的监控
+	// 带自定义logger的监控（包级函数）
 	monitor.Track(ctx, time.Now(), "functionWithCustomLogger", logzInfof)
 
-	// 空context监控
+	// 空context监控（包级函数）
 	monitor.Track(nil, time.Now(), "nilContext", logzInfof)
 
-	// 无traceID的context监控
+	// 无traceID的context监控（包级函数）
 	emptyCtx := context.WithValue(ctx, "other-key", "other-value")
 	monitor.Track(emptyCtx, time.Now(), "emptyTraceContext", logzInfof)
+
+	fmt.Println()
+}
+
+func demonstrateInstanceBasedUsage() {
+	fmt.Println("3. 演示实例方法使用:")
+
+	ctx := context.Background()
+
+	// 创建自定义追踪器实例
+	customTracker := monitor.NewLatencyTracker(
+		monitor.WithLogger(logzInfof),
+		monitor.WithContextEnhancer(customContextEnhancer),
+	)
+
+	// 使用实例方法
+	customTracker.Track(ctx, time.Now(), "instanceMethod1", nil)
+	customTracker.Track(ctx, time.Now(), "instanceMethod2", nil)
+
+	// 创建另一个不同配置的实例
+	simpleTracker := monitor.NewLatencyTracker(
+		monitor.WithLogger(func(ctx context.Context, format string, args ...interface{}) {
+			fmt.Printf("[Simple] "+format+"\n", args...)
+		}),
+	)
+
+	// 使用简单实例
+	simpleTracker.Track(ctx, time.Now(), "simpleInstance", nil)
 
 	fmt.Println()
 }

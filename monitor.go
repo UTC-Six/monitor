@@ -52,35 +52,18 @@ func NewLatencyTracker(opts ...TrackerOption) *LatencyTracker {
 	return lt
 }
 
-// defaultLogger 默认日志函数
-func defaultLogger(ctx context.Context, format string, args ...interface{}) {
-	// 默认使用标准log，可以通过WithLogger覆盖
-	fmt.Printf(format+"\n", args...)
-}
-
-// defaultContextEnhancer 默认的context增强器
-func defaultContextEnhancer(ctx context.Context) (context.Context, context.CancelFunc) {
-	// 如果没有设置WithContextEnhancer，返回Background和空cancel函数
-	return context.Background(), func() {}
-}
-
-// Track 追踪执行时间（最优实现）
-func Track(ctx context.Context, startTime time.Time, name string, logger func(ctx context.Context, format string, args ...interface{})) {
-	// 确保defaultTracker已初始化
-	if defaultTracker == nil {
-		defaultTracker = NewLatencyTracker()
-	}
-
-	// 如果没有提供logger，使用默认的
+// Track 实例方法：追踪执行时间
+func (lt *LatencyTracker) Track(ctx context.Context, startTime time.Time, name string, logger func(ctx context.Context, format string, args ...interface{})) {
+	// 如果没有提供logger，使用实例的logger
 	if logger == nil {
-		logger = defaultTracker.logger
+		logger = lt.logger
 	}
 
 	// 计算耗时
 	duration := time.Since(startTime)
 
 	// 使用配置的context增强器创建新的context和cancel函数
-	enhancedCtx, cancel := defaultTracker.contextEnhancer(ctx)
+	enhancedCtx, cancel := lt.contextEnhancer(ctx)
 
 	// 使用 threading.GoSafe 异步记录完成日志（最优选择）
 	threading.GoSafe(func() error {
@@ -100,4 +83,27 @@ func Track(ctx context.Context, startTime time.Time, name string, logger func(ct
 			defer cancel()
 			logger(enhancedCtx, "[Latency] Name=%s, Duration=%v, Status=logError, Error=%v", name, duration, r)
 		}))
+}
+
+// defaultLogger 默认日志函数
+func defaultLogger(ctx context.Context, format string, args ...interface{}) {
+	// 默认使用标准log，可以通过WithLogger覆盖
+	fmt.Printf(format+"\n", args...)
+}
+
+// defaultContextEnhancer 默认的context增强器
+func defaultContextEnhancer(ctx context.Context) (context.Context, context.CancelFunc) {
+	// 如果没有设置WithContextEnhancer，返回Background和空cancel函数
+	return context.Background(), func() {}
+}
+
+// Track 包级函数：使用默认追踪器追踪执行时间
+func Track(ctx context.Context, startTime time.Time, name string, logger func(ctx context.Context, format string, args ...interface{})) {
+	// 确保defaultTracker已初始化
+	if defaultTracker == nil {
+		defaultTracker = NewLatencyTracker()
+	}
+
+	// 使用默认追踪器的Track方法
+	defaultTracker.Track(ctx, startTime, name, logger)
 }
